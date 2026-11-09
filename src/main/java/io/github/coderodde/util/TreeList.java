@@ -2,10 +2,12 @@ package io.github.coderodde.util;
 
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
@@ -19,6 +21,8 @@ import java.util.stream.Stream;
  * @param <E>
  */
 public class TreeList<E> implements List<E> {
+    
+    private static final int INCORRECT_HEIGHT_SENTINEL = 1_000_000;
 
     private static final class TreeListNode<E> {
         E element;
@@ -26,17 +30,40 @@ public class TreeList<E> implements List<E> {
         TreeListNode<E> right;
         TreeListNode<E> parent;
         int height;
-        int leftCount;
+        int treeSize;
         
         private TreeListNode(E element) {
             this.element = element;
         }
         
         @Override
+        public boolean equals(Object o) {
+            return o instanceof TreeListNode<?> other 
+                    && Objects.equals(this, other)
+                    && left     == other.left
+                    && right    == other.right
+                    && parent   == other.parent
+                    && height   == other.height
+                    && treeSize == other.treeSize;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 53 * hash + Objects.hashCode(element);
+            hash = 53 * hash + Objects.hashCode(left);
+            hash = 53 * hash + Objects.hashCode(right);
+            hash = 53 * hash + Objects.hashCode(parent);
+            hash = 53 * hash + height;
+            hash = 53 * hash + treeSize;
+            return hash;
+        }
+        
+        @Override
         public String toString() {
-            return "[Eleme: %s, h: %d, lc: &d]".formatted(element, 
-                                                          height, 
-                                                          leftCount);
+            return "[Element: %s, h: %d, ts: %d]".formatted(element, 
+                                                            height, 
+                                                            treeSize);
         }
     }
     
@@ -362,6 +389,103 @@ public class TreeList<E> implements List<E> {
         
         return node;
     }
+    
+    public boolean invariantHolds() {
+        return treeHasNoCycles()
+            && treeHasCorrectHeightFields()
+            && treeIsBalanced();
+    }
+    
+    private boolean treeIsBalanced() {
+        return treeIsBalanced(root);
+    }
+    
+    private boolean treeIsBalanced(TreeListNode<E> node) {
+        if (node == null) {
+            return true;
+        }
+        
+        int leftHeight  = getHeight(node.left);
+        int rightHeight = getHeight(node.right);
+        int balance     = Math.abs(leftHeight - rightHeight);
+        
+        return balance < 2;
+    }
+    
+    private static <E> int getHeight(TreeListNode<E> node) {
+        return node == null ? -1 : node.height;
+    }
+    
+    private boolean treeHasCorrectHeightFields() {
+        if (root == null) {
+            return true;
+        }
+        
+        return root.height == countHeight(root);
+    }
+    
+    private int countHeight(TreeListNode<E> node) {
+        if (node == null) {
+            return -1;
+        }
+        
+        int expectedHeight = Math.max(countHeight(node.left),
+                                      countHeight(node.right)) + 1;
+        
+        return node.height != expectedHeight 
+                           ? INCORRECT_HEIGHT_SENTINEL 
+                           : expectedHeight;
+    }
+    
+    private boolean treeHasNoCycles() {
+        return treeHasNoCycles(new HashSet<>(), root);
+    }
+    
+    private boolean treeHasNoCycles(Set<TreeListNode<E>> visited, 
+                                    TreeListNode<E> node) {
+        
+        if (node == null) {
+            return true;
+        }
+        
+        visited.add(node);
+        
+        if (!treeHasNoCycles(visited, node.left) ||
+            !treeHasNoCycles(visited, node.right)) {
+            return false;
+        }
+        
+        visited.remove(node);
+        
+        return true;
+    }
+    
+    private static <E> boolean
+         treeNodesHaveCorrectHeightsImpl(TreeListNode<E> node) {
+             
+        if (node.left == null && node.right == null) {
+            return node.height == 0;
+        }
+        
+        if (node.left != null 
+                && !treeNodesHaveCorrectHeightsImpl(node.left)) {
+            
+            return false;
+        }
+        
+        if (node.right != null 
+            && !treeNodesHaveCorrectHeightsImpl(node.right)) {
+            
+            return false;
+        }
+        
+        int expectedNodeHeight = Math.max(node.left.height,
+                                          node.right.height) + 1;
+        
+        return node.height == expectedNodeHeight;
+    }
+         
+    
     
     private static <E> boolean containsImpl(TreeListNode<E> node, E element) {
         if (node == null) {
