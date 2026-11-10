@@ -28,9 +28,8 @@ public class TreeList<E> implements List<E> {
         E element;
         TreeListNode<E> left;
         TreeListNode<E> right;
-        TreeListNode<E> parent;
         int height;
-        int treeSize;
+        int treeSize = 1;
         
         private TreeListNode(E element) {
             this.element = element;
@@ -39,10 +38,9 @@ public class TreeList<E> implements List<E> {
         @Override
         public boolean equals(Object o) {
             return o instanceof TreeListNode<?> other 
-                    && Objects.equals(this, other)
+                    && Objects.equals(this.element, other.element)
                     && left     == other.left
                     && right    == other.right
-                    && parent   == other.parent
                     && height   == other.height
                     && treeSize == other.treeSize;
         }
@@ -53,7 +51,6 @@ public class TreeList<E> implements List<E> {
             hash = 53 * hash + Objects.hashCode(element);
             hash = 53 * hash + Objects.hashCode(left);
             hash = 53 * hash + Objects.hashCode(right);
-            hash = 53 * hash + Objects.hashCode(parent);
             hash = 53 * hash + height;
             hash = 53 * hash + treeSize;
             return hash;
@@ -84,7 +81,7 @@ public class TreeList<E> implements List<E> {
     
     @Override
     public int size() {
-        return size;
+        return treeSize(root);
     }
 
     @Override
@@ -118,6 +115,7 @@ public class TreeList<E> implements List<E> {
         
         if (root == null) {
             root = new TreeListNode<>(e);
+            root.treeSize = 1;
             size = 1;
             return true;
         }
@@ -130,7 +128,7 @@ public class TreeList<E> implements List<E> {
         
         TreeListNode<E> newNode = new TreeListNode<>(e);
         node.right              = newNode;
-        newNode.parent          = node;
+        newNode.treeSize        = 1;
         
         return true;
     }
@@ -153,11 +151,14 @@ public class TreeList<E> implements List<E> {
         
         ++modCount;
         
-        TreeListNode<E> newTreeRoot = treeify(c);
+        Object[] array = c.toArray();
+        
+        TreeListNode<E> newTreeRoot = treeify(array, 0, array.length);
         
         if (size == 0) {
-            size = c.size();
-            root = newTreeRoot;
+            size          = c.size();
+            root          = newTreeRoot;
+            root.treeSize = c.size();
         } else {
             appendSubTree(newTreeRoot);
         }
@@ -175,61 +176,32 @@ public class TreeList<E> implements List<E> {
         node.right = subTreeRoot;
     }
 
-    private static <E> TreeListNode<E> treeify(Collection<? extends E> c) {
-        E[] array       = c.toArray((E[]) new Object[c.size()]);
-        int middleIndex = array.length / 2;
-        
-        TreeListNode<E> subTreeRoot = new TreeListNode<>(array[middleIndex]);
-        
-        return treeify(array, 
-                       0,
-                       array.length, 
-                       middleIndex, 
-                       subTreeRoot);
-    }
-    
-    private static <E> TreeListNode<E> treeify(E[] array, 
-                                               int from, 
-                                               int to,
-                                               int leftCount,
-                                               TreeListNode<E> parent) {
-        
-        int rangeLength = to - from;
-        int middleIndex = from + rangeLength / 2;
-        
-        if (rangeLength == 0) {
-            System.out.println("yesss");
-        }
-        
-        if (rangeLength == 1) {
-            TreeListNode<E> node = new TreeListNode<>(array[middleIndex]);
-            node.parent          = parent;
-            return node;
-        }
-        
-        TreeListNode<E> middleNode = new TreeListNode<>(array[middleIndex]);
-        
-        TreeListNode<E> leftChild = treeify(array, 
-                                            from, 
-                                            middleIndex, 
-                                            leftCount,
-                                            middleNode);
-        
-        TreeListNode<E> rightChild = treeify(array, 
-                                             middleIndex + 1,
-                                             to, 
-                                             rangeLength - middleIndex, 
-                                             middleNode);
-        middleNode.left  = leftChild;
-        middleNode.right = rightChild;
-        
-        return middleNode;
-    }
     
     @Override
-    public boolean addAll(int index, Collection<? extends E> c) {
+    public boolean addAll(int index, Collection<? extends E> elements) {
+        checkPosition(index);
         
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        Object[] array = Objects.requireNonNull(elements).toArray();
+        
+        if (array.length == 0) {
+            return false;
+        }
+            
+        if ((long) size() + array.length > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                "List is to large to accommodate the collection.");
+        }
+        
+        TreeListNode<E> incoming = treeify(array, 0, array.length);
+        Split<E> parts           = split(root, index);
+        root                     = concatenate(
+                                       concatenate(
+                                           parts.left(), 
+                                           incoming), 
+                                       parts.right());
+    
+        ++modCount;
+        return true;
     }
 
     @Override
@@ -254,27 +226,43 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public void clear() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        if (root != null) {
+            root = null;
+            ++modCount;
+        }
     }
 
     @Override
     public E get(int index) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        return nodeAt(Objects.checkIndex(index, size())).element;
     }
 
     @Override
     public E set(int index, E element) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        TreeListNode<E> node = nodeAt(Objects.checkIndex(index, size()));
+        E old        = node.element;
+        node.element = element;
+        return old;
     }
 
     @Override
     public void add(int index, E element) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        checkPosition(index);
+        
+        if (size() == Integer.MAX_VALUE) {
+            throw new IllegalStateException("List is to large.");
+        }
+        
+        root = insert(root, index, element);
+        ++modCount;
     }
-
+    
     @Override
     public E remove(int index) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        E old = get(index);
+        root = delete(root, index);
+        ++modCount;
+        return old;
     }
 
     @Override
@@ -365,6 +353,234 @@ public class TreeList<E> implements List<E> {
     @Override
     public void forEach(Consumer<? super E> action) {
         List.super.forEach(action); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+    }
+    
+    protected void removeRange(int fromIndex, int toIndex) {
+        Objects.checkFromToIndex(fromIndex, toIndex, size());
+        
+        if (fromIndex == toIndex) {
+            return;
+        }
+        
+        if (fromIndex == 0 && toIndex == size()) {
+            clear();
+            return;
+        }
+        
+        Split<E> prefix = split(root, fromIndex);
+        Split<E> suffix = split(prefix.right(), toIndex - fromIndex);
+        root = conccatenate(prefix.left(), suffix.right());
+        ++modCount;
+    }
+    
+    private TreeListNode<E> nodeAt(int index) {
+        TreeListNode<E> node = root;
+        
+        while (true) {
+            int leftSize = treeSize(node.left);
+            
+            if (index < leftSize) {
+                node = node.left;
+            } else if (index == leftSize) {
+                return node;
+            } else {
+                index -= leftSize + 1;
+                node = node.right;
+            }
+        }
+    }
+    
+    private static <E> int height(TreeListNode<E> node) {
+        return node == null ? -1 : node.height;
+    }
+    
+    private static <E> int treeSize(TreeListNode<E> node) {
+        return node == null ? 0 : node.treeSize;
+    }
+    
+    private static <E> void update(TreeListNode<E> node) {
+        node.height   = 1 + Math.max(height(node.left), height(node.right));
+        node.treeSize = 1 + treeSize(node.left) + treeSize(node.right); 
+    }
+    
+    private static <E> TreeListNode<E> rotateLeft(TreeListNode<E> node) {
+        TreeListNode<E> top = node.right;
+        node.right          = top.left;
+        top.left            = node;
+        
+        update(node);
+        update(top);
+        
+        return top;
+    }
+    
+    private static <E> TreeListNode<E> rotateRight(TreeListNode<E> node) {
+        TreeListNode<E> top = node.left;
+        node.left           = top.right;
+        top.right           = node;
+        
+        update(node);
+        update(top);
+        
+        return top;
+    }
+    
+    private static <E> TreeListNode<E> balance(TreeListNode<E> node) {
+        update(node);
+        
+        int factor = height(node.left) - height(node.right);;
+        
+        if (factor > 1) {
+            if (height(node.left.left) < height(node.left.right)) {
+                node.left = rotateLeft(node.left);
+            }
+            
+            return rotateRight(node);
+        }
+        
+        if (factor < -1) {
+            if (height(node.right.right) < height(node.right.left)) {
+                node.right = rotateRight(node.right);
+            }
+            
+            return rotateLeft(node);
+        }
+        
+        return node;
+    }
+    
+    private static <E> TreeListNode<E> insert(TreeListNode<E> node,
+                                              int index,
+                                              E element) {
+        if (node == null) {
+            return new TreeListNode<>(element);
+        }
+        
+        int leftSize = treeSize(node.left);
+        
+        if (index <= leftSize) {
+            node.left = insert(node.left, index, element);
+        } else {
+            node.right = insert(node.right, index - leftSize - 1, element);
+        }
+        
+        return balance(node);
+    }
+    
+    private static <E> TreeListNode<E> delete(TreeListNode<E> node, int index) {
+        int leftSize = treeSize(node.left);
+        
+        if (index < leftSize) {
+            node.left = delete(node.left, index);
+        } else if (index > leftSize) {
+            node.right = delete(node.right, index - leftSize - 1);
+        } else {
+            if (node.left == null || node.right == null) {
+                TreeListNode<E> child = node.left == null 
+                                      ? node.right 
+                                      : node.left;
+                
+                return child;
+            }
+            
+            node.element = minimum(node.right).element;
+            node.right   = delete(node.right, 0);
+        }
+        
+        return balance(node);
+    }
+    
+    private static <E> Split<E> split(TreeListNode<E> node, int index) {
+        if (node == null) {
+            return new Split<>(null, null);
+        }
+        
+        if (index == 0) {
+            return new Split<>(null, node);
+        }
+        
+        if (index == treeSize(node)) {
+            return new Split<>(node, null);
+        }
+        
+        TreeListNode<E> left  = node.left;
+        TreeListNode<E> right = node.right;
+        
+        int leftSize = treeSize(left);
+        
+        node.left  = null;
+        node.right = null;
+        
+        update(node);
+        
+        if (index <= leftSize) {
+            Split<E> parts = split(left, index);
+            return new Split<>(parts.left(), join(parts.right(), node, right));
+        }
+        
+        Split<E> parts = split(right, index - leftSize - 1);
+        return new Split<>(join(left, node, parts.left()), parts.right());
+    }
+    
+    private static <E> TreeListNode<E> join(TreeListNode<E> left,
+                                            TreeListNode<E> pivot,
+                                            TreeListNode<E> right) {
+        if (height(left) > height(right) + 1) {
+            left.right = join(left.right, pivot, right);
+            return balance(left);
+        }
+        
+        if (height(right) > height(left) + 1) {
+            right.left = join(left, pivot, right.left);
+            return balance(right);
+        }
+        
+        pivot.left  = left;
+        pivot.right = right;
+        
+        update(pivot);
+        
+        return pivot;
+    }
+    
+    private static <E> TreeListNode<E> concatenate(TreeListNode<E> left,
+                                                   TreeListNode<E> right) {
+        if (left == null) {
+            return right;
+        }
+        
+        if (right == null) {
+            return left;
+        }
+        
+        TreeListNode<E> pivot = minimum(right);
+        right = delete(right, 0);
+        
+        pivot.left  = null;
+        pivot.right = null;
+        
+        update(pivot);
+        
+        return join(left, pivot, right);
+    }
+    
+    private static <E> TreeListNode<E> treeify(Object[] array,
+                                               int from, 
+                                               int to) {
+        if (from == to) {
+            return null;
+        }
+        
+        int mid              = from + (to - from) / 2;
+        E element            = (E) array[mid];
+        TreeListNode<E> node = new TreeListNode<>(element);
+        
+        node.left  = treeify(array, from, mid);
+        node.right = treeify(array, mid + 1, to);
+        
+        update(node);
+        
+        return node;
     }
     
     private static <E> TreeListNode<E> successor(TreeListNode<E> node) {
@@ -498,5 +714,10 @@ public class TreeList<E> implements List<E> {
         
         return containsImpl(node.left, element) && 
                containsImpl(node.right, element);
+    }
+    
+    private static final record Split<E>(TreeListNode<E> left, 
+                                         TreeListNode<E> right) {
+        
     }
 }
