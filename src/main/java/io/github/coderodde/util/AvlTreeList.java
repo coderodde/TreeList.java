@@ -24,7 +24,9 @@ import java.util.stream.Stream;
  * 
  * @param <E>
  */
-public class TreeList<E> implements List<E> {
+public class AvlTreeList<E> implements List<E> {
+    
+    private static final int INCORRECT_HEIGHT_SENTINEL = Integer.MAX_VALUE - 1;
     
     private static final class TreeListNode<E> {
         E element;
@@ -76,11 +78,11 @@ public class TreeList<E> implements List<E> {
      */
     private int modCount;
     
-    public TreeList() {
+    public AvlTreeList() {
         
     }
     
-    public TreeList(Collection<? extends E> elements) {
+    public AvlTreeList(Collection<? extends E> elements) {
         Object[] array = Objects.requireNonNull(elements).toArray();
         root = treeify(array, 0, array.length);
     }
@@ -620,7 +622,7 @@ public class TreeList<E> implements List<E> {
                                       countHeight(node.right)) + 1;
         
         return node.height != expectedHeight 
-                           ? INCORRECT_HEIGHT_SENTINEL 
+                           ? INCORRECT_HEIGHT_SENTINEL
                            : expectedHeight;
     }
     
@@ -651,7 +653,8 @@ public class TreeList<E> implements List<E> {
         return true;
     }
     
-    private static <E> boolean containsImpl(TreeListNode<E> node, E element) {
+    private static <E> boolean containsImpl(TreeListNode<E> node, 
+                                            Object element) {
         if (node == null) {
             return false;
         }
@@ -665,9 +668,7 @@ public class TreeList<E> implements List<E> {
     }
     
     private static final record Split<E>(TreeListNode<E> left, 
-                                         TreeListNode<E> right) {
-        
-    }
+                                         TreeListNode<E> right) {}
 
     private class SubList extends AbstractList<E> {
 
@@ -675,7 +676,7 @@ public class TreeList<E> implements List<E> {
         private final int toIndex;
         
         public SubList(int fromIndex, int toIndex) {
-            Objects.checkFromToIndex(fromIndex, toIndex, size);
+            Objects.checkFromToIndex(fromIndex, toIndex, size());
             
             this.fromIndex = fromIndex;
             this.toIndex   = toIndex;
@@ -683,12 +684,12 @@ public class TreeList<E> implements List<E> {
 
         @Override
         public void clear() {
-            TreeList.this.removeRange(fromIndex, toIndex);
+            AvlTreeList.this.removeRange(fromIndex, toIndex);
         }
 
         @Override
         public E get(int index) {
-            return TreeList.this.get(fromIndex + index);
+            return AvlTreeList.this.get(fromIndex + index);
         }
 
         @Override
@@ -864,7 +865,7 @@ public class TreeList<E> implements List<E> {
                 throw new IllegalStateException();
             }
             
-            TreeList.this.remove(lastIndex);
+            AvlTreeList.this.remove(lastIndex);
             
             if (lastIndex < cursor) {
                 --cursor;
@@ -891,7 +892,7 @@ public class TreeList<E> implements List<E> {
         public void add(E e) {
             checkModification();
             
-            TreeList.this.add(cursor, e);
+            AvlTreeList.this.add(cursor, e);
             ++cursor;
             rebuildPath();
             last = null;
