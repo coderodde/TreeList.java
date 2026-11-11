@@ -27,7 +27,6 @@ import java.util.stream.Stream;
  */
 public class AvlTreeList<E> implements List<E> {
     
-    
     private static final class TreeListNode<E> {
         E element;
         TreeListNode<E> left;
@@ -37,27 +36,6 @@ public class AvlTreeList<E> implements List<E> {
         
         private TreeListNode(E element) {
             this.element = element;
-        }
-        
-        @Override
-        public boolean equals(Object o) {
-            return o instanceof TreeListNode<?> other 
-                    && Objects.equals(this.element, other.element)
-                    && left     == other.left
-                    && right    == other.right
-                    && height   == other.height
-                    && treeSize == other.treeSize;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 3;
-            hash = 53 * hash + Objects.hashCode(element);
-            hash = 53 * hash + Objects.hashCode(left);
-            hash = 53 * hash + Objects.hashCode(right);
-            hash = 53 * hash + height;
-            hash = 53 * hash + treeSize;
-            return hash;
         }
         
         @Override
@@ -121,7 +99,7 @@ public class AvlTreeList<E> implements List<E> {
 
     @Override
     public <T> T[] toArray(T[] a) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -132,12 +110,12 @@ public class AvlTreeList<E> implements List<E> {
 
     @Override
     public boolean remove(Object o) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public boolean containsAll(Collection<?> c) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -581,24 +559,42 @@ public class AvlTreeList<E> implements List<E> {
     }
     
     public boolean invariantHolds() {
-        Set<TreeListNode<?>> visited =
-                Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<TreeListNode<E>> visited = 
+            Collections.newSetFromMap(new IdentityHashMap<>());
+        
         return validate(root, visited) >= 0;
     }
 
-    private static int validate(TreeListNode<?> node,
-                                Set<TreeListNode<?>> visited) {
-        if (node == null) return 0;
-        if (!visited.add(node)) return -1;
-        int left = validate(node.left, visited);
-        if (left < 0) return -1;
-        int right = validate(node.right, visited);
-        if (right < 0) return -1;
-        if (node.treeSize != 1 + left + right
-                || node.height != 1 + Math.max(height(node.left), height(node.right))
-                || Math.abs(height(node.left) - height(node.right)) > 1) {
+    private static <E> int validate(TreeListNode<E> node,
+                                    Set<TreeListNode<E>> visited) {
+        if (node == null) {
+            return 0;
+        }
+        
+        if (!visited.add(node)) {
             return -1;
         }
+        
+        int left = validate(node.left, visited);
+        
+        if (left < 0) {
+            return -1;
+        }
+        
+        int right = validate(node.right, visited);
+        
+        if (right < 0) {
+            return -1;
+        }
+        
+        if (node.treeSize != 1 + left + right
+                || node.height != 1 + Math.max(height(node.left), 
+                                               height(node.right))
+                || Math.abs(height(node.left) - height(node.right)) > 1) {
+            
+            return -1;
+        }
+        
         return 1 + left + right;
     }
 
@@ -626,12 +622,15 @@ public class AvlTreeList<E> implements List<E> {
 
         public SubList(int fromIndex, int toIndex) {
             int parentSize = AvlTreeList.this.size();
+            
             if (fromIndex < 0 || toIndex > parentSize) {
                 throw new IndexOutOfBoundsException();
             }
+            
             if (fromIndex > toIndex) {
                 throw new IllegalArgumentException("fromIndex > toIndex");
             }
+            
             this.fromIndex = fromIndex;
             this.viewSize = toIndex - fromIndex;
             this.expectedModCount = AvlTreeList.this.modCount;
@@ -652,8 +651,13 @@ public class AvlTreeList<E> implements List<E> {
         protected void removeRange(int from, int to) {
             checkModification();
             Objects.checkFromToIndex(from, to, viewSize);
-            if (from == to) return;
+            
+            if (from == to) {
+                return;
+            }
+            
             AvlTreeList.this.removeRange(fromIndex + from, fromIndex + to);
+            
             viewSize -= to - from;
             expectedModCount = AvlTreeList.this.modCount;
             ++modCount;
