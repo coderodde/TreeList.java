@@ -5,7 +5,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.ConcurrentModificationException;
-import java.util.HashSet;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -26,7 +27,6 @@ import java.util.stream.Stream;
  */
 public class AvlTreeList<E> implements List<E> {
     
-    private static final int INCORRECT_HEIGHT_SENTINEL = Integer.MAX_VALUE - 1;
     
     private static final class TreeListNode<E> {
         E element;
@@ -416,7 +416,7 @@ public class AvlTreeList<E> implements List<E> {
     private static <E> TreeListNode<E> balance(TreeListNode<E> node) {
         update(node);
         
-        int factor = height(node.left) - height(node.right);;
+        int factor = height(node.left) - height(node.right);
         
         if (factor > 1) {
             if (height(node.left.left) < height(node.left.right)) {
@@ -560,6 +560,7 @@ public class AvlTreeList<E> implements List<E> {
         }
         
         int mid              = from + (to - from) / 2;
+        @SuppressWarnings("unchecked")
         E element            = (E) array[mid];
         TreeListNode<E> node = new TreeListNode<>(element);
         
@@ -580,79 +581,27 @@ public class AvlTreeList<E> implements List<E> {
     }
     
     public boolean invariantHolds() {
-        return treeHasNoCycles()
-            && treeHasCorrectHeightFields()
-            && treeIsBalanced();
+        Set<TreeListNode<?>> visited =
+                Collections.newSetFromMap(new IdentityHashMap<>());
+        return validate(root, visited) >= 0;
     }
-    
-    private boolean treeIsBalanced() {
-        return treeIsBalanced(root);
-    }
-    
-    private boolean treeIsBalanced(TreeListNode<E> node) {
-        if (node == null) {
-            return true;
-        }
-        
-        int leftHeight  = getHeight(node.left);
-        int rightHeight = getHeight(node.right);
-        int balance     = Math.abs(leftHeight - rightHeight);
-        
-        return balance < 2;
-    }
-    
-    private static <E> int getHeight(TreeListNode<E> node) {
-        return node == null ? -1 : node.height;
-    }
-    
-    private boolean treeHasCorrectHeightFields() {
-        if (root == null) {
-            return true;
-        }
-        
-        return root.height == countHeight(root);
-    }
-    
-    private int countHeight(TreeListNode<E> node) {
-        if (node == null) {
+
+    private static int validate(TreeListNode<?> node,
+                                Set<TreeListNode<?>> visited) {
+        if (node == null) return 0;
+        if (!visited.add(node)) return -1;
+        int left = validate(node.left, visited);
+        if (left < 0) return -1;
+        int right = validate(node.right, visited);
+        if (right < 0) return -1;
+        if (node.treeSize != 1 + left + right
+                || node.height != 1 + Math.max(height(node.left), height(node.right))
+                || Math.abs(height(node.left) - height(node.right)) > 1) {
             return -1;
         }
-        
-        int expectedHeight = Math.max(countHeight(node.left),
-                                      countHeight(node.right)) + 1;
-        
-        return node.height != expectedHeight 
-                           ? INCORRECT_HEIGHT_SENTINEL
-                           : expectedHeight;
+        return 1 + left + right;
     }
-    
-    private boolean treeHasNoCycles() {
-        return treeHasNoCycles(new HashSet<>(), root);
-    }
-    
-    private boolean treeHasNoCycles(Set<TreeListNode<E>> visited, 
-                                    TreeListNode<E> node) {
-        
-        if (node == null) {
-            return true;
-        }
-        
-        if (visited.contains(node)) {
-            return false;
-        }
-        
-        visited.add(node);
-        
-        if (!treeHasNoCycles(visited, node.left) ||
-            !treeHasNoCycles(visited, node.right)) {
-            return false;
-        }
-        
-        visited.remove(node);
-        
-        return true;
-    }
-    
+
     private static <E> boolean containsImpl(TreeListNode<E> node, 
                                             Object element) {
         if (node == null) {
@@ -671,33 +620,59 @@ public class AvlTreeList<E> implements List<E> {
                                          TreeListNode<E> right) {}
 
     private class SubList extends AbstractList<E> {
-
         private final int fromIndex;
-        private final int toIndex;
-        
+        private int viewSize;
+        private int expectedModCount;
+
         public SubList(int fromIndex, int toIndex) {
-            Objects.checkFromToIndex(fromIndex, toIndex, size());
-            
+            int parentSize = AvlTreeList.this.size();
+            if (fromIndex < 0 || toIndex > parentSize) {
+                throw new IndexOutOfBoundsException();
+            }
+            if (fromIndex > toIndex) {
+                throw new IllegalArgumentException("fromIndex > toIndex");
+            }
             this.fromIndex = fromIndex;
-            this.toIndex   = toIndex;
+            this.viewSize = toIndex - fromIndex;
+            this.expectedModCount = AvlTreeList.this.modCount;
+        }
+
+        private void checkModification() {
+            if (expectedModCount != AvlTreeList.this.modCount) {
+                throw new ConcurrentModificationException();
+            }
         }
 
         @Override
         public void clear() {
-            AvlTreeList.this.removeRange(fromIndex, toIndex);
+            removeRange(0, size());
+        }
+
+        @Override
+        protected void removeRange(int from, int to) {
+            checkModification();
+            Objects.checkFromToIndex(from, to, viewSize);
+            if (from == to) return;
+            AvlTreeList.this.removeRange(fromIndex + from, fromIndex + to);
+            viewSize -= to - from;
+            expectedModCount = AvlTreeList.this.modCount;
+            ++modCount;
         }
 
         @Override
         public E get(int index) {
+            checkModification();
+            Objects.checkIndex(index, viewSize);
             return AvlTreeList.this.get(fromIndex + index);
         }
 
         @Override
         public int size() {
-            return toIndex - fromIndex;
+            checkModification();
+            return viewSize;
         }
     }
-    
+
     private final class TreeIterator implements ListIterator<E> {
 
         private int cursor;
