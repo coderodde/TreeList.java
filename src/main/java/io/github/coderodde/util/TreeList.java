@@ -1,11 +1,15 @@
 package io.github.coderodde.util;
 
+import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.ConcurrentModificationException;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Spliterator;
@@ -79,6 +83,11 @@ public class TreeList<E> implements List<E> {
      */
     private int modCount;
     
+    public TreeList(Collection<? extends E> elements) {
+        Object[] array = Objects.requireNonNull(elements).toArray();
+        root = treeify(array, 0, array.length);
+    }
+    
     @Override
     public int size() {
         return treeSize(root);
@@ -96,9 +105,9 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public Iterator<E> iterator() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        return listIterator(0);
     }
-
+    
     @Override
     public Object[] toArray() {
         throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
@@ -144,26 +153,8 @@ public class TreeList<E> implements List<E> {
     }
 
     @Override
-    public boolean addAll(Collection<? extends E> c) {
-        if (c.isEmpty()) {
-            return false;
-        }
-        
-        ++modCount;
-        
-        Object[] array = c.toArray();
-        
-        TreeListNode<E> newTreeRoot = treeify(array, 0, array.length);
-        
-        if (size == 0) {
-            size          = c.size();
-            root          = newTreeRoot;
-            root.treeSize = c.size();
-        } else {
-            appendSubTree(newTreeRoot);
-        }
-        
-        return true;
+    public boolean addAll(Collection<? extends E> elements) {
+        return addAll(size(), elements);
     }
     
     private void appendSubTree(TreeListNode<E> subTreeRoot) {
@@ -175,7 +166,6 @@ public class TreeList<E> implements List<E> {
         
         node.right = subTreeRoot;
     }
-
     
     @Override
     public boolean addAll(int index, Collection<? extends E> elements) {
@@ -194,8 +184,8 @@ public class TreeList<E> implements List<E> {
         
         TreeListNode<E> incoming = treeify(array, 0, array.length);
         Split<E> parts           = split(root, index);
-        root                     = concatenate(
-                                       concatenate(
+        root                     = join(
+                                       join(
                                            parts.left(), 
                                            incoming), 
                                        parts.right());
@@ -206,22 +196,22 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public boolean removeAll(Collection<?> c) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public boolean retainAll(Collection<?> c) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public void replaceAll(UnaryOperator<E> operator) {
-        List.super.replaceAll(operator); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public void sort(Comparator<? super E> c) {
-        List.super.sort(c); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -267,92 +257,93 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public int indexOf(Object o) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public int lastIndexOf(Object o) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public ListIterator<E> listIterator() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        return listIterator(0);
     }
 
     @Override
     public ListIterator<E> listIterator(int index) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        checkPosition(index);
+        return new TreeIterator(index);
     }
 
     @Override
     public List<E> subList(int fromIndex, int toIndex) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        return new SubList(fromIndex, toIndex);
     }
 
     @Override
     public Spliterator<E> spliterator() {
-        return List.super.spliterator(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public void addFirst(E e) {
-        List.super.addFirst(e); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        add(0, e);
     }
 
     @Override
     public void addLast(E e) {
-        List.super.addLast(e); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        add(size(), e);
     }
 
     @Override
     public E getFirst() {
-        return List.super.getFirst(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        return nodeAt(0).element;
     }
 
     @Override
     public E getLast() {
-        return List.super.getLast(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        return nodeAt(size() - 1).element;
     }
 
     @Override
     public E removeFirst() {
-        return List.super.removeFirst(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        return remove(0);
     }
 
     @Override
     public E removeLast() {
-        return List.super.removeLast(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        return remove(size() - 1);
     }
 
     @Override
     public List<E> reversed() {
-        return List.super.reversed(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public <T> T[] toArray(IntFunction<T[]> generator) {
-        return List.super.toArray(generator); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public boolean removeIf(Predicate<? super E> filter) {
-        return List.super.removeIf(filter); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Stream<E> stream() {
-        return List.super.stream(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Stream<E> parallelStream() {
-        return List.super.parallelStream(); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public void forEach(Consumer<? super E> action) {
-        List.super.forEach(action); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/OverriddenMethodBody
+        throw new UnsupportedOperationException();
     }
     
     protected void removeRange(int fromIndex, int toIndex) {
@@ -369,7 +360,7 @@ public class TreeList<E> implements List<E> {
         
         Split<E> prefix = split(root, fromIndex);
         Split<E> suffix = split(prefix.right(), toIndex - fromIndex);
-        root = conccatenate(prefix.left(), suffix.right());
+        root            = join(prefix.left(), suffix.right());
         ++modCount;
     }
     
@@ -543,8 +534,8 @@ public class TreeList<E> implements List<E> {
         return pivot;
     }
     
-    private static <E> TreeListNode<E> concatenate(TreeListNode<E> left,
-                                                   TreeListNode<E> right) {
+    private static <E> TreeListNode<E> join(TreeListNode<E> left,
+                                            TreeListNode<E> right) {
         if (left == null) {
             return right;
         }
@@ -581,21 +572,6 @@ public class TreeList<E> implements List<E> {
         update(node);
         
         return node;
-    }
-    
-    private static <E> TreeListNode<E> successor(TreeListNode<E> node) {
-        if (node.right != null) {
-            return minimum(node.right);
-        }
-        
-        TreeListNode<E> parent = node.parent;
-        
-        while (parent != null && parent.right == node) {
-            node   = parent;
-            parent = parent.parent;
-        }
-        
-        return parent;
     }
     
     private static <E> TreeListNode<E> minimum(TreeListNode<E> node) {
@@ -676,33 +652,6 @@ public class TreeList<E> implements List<E> {
         return true;
     }
     
-    private static <E> boolean
-         treeNodesHaveCorrectHeightsImpl(TreeListNode<E> node) {
-             
-        if (node.left == null && node.right == null) {
-            return node.height == 0;
-        }
-        
-        if (node.left != null 
-                && !treeNodesHaveCorrectHeightsImpl(node.left)) {
-            
-            return false;
-        }
-        
-        if (node.right != null 
-            && !treeNodesHaveCorrectHeightsImpl(node.right)) {
-            
-            return false;
-        }
-        
-        int expectedNodeHeight = Math.max(node.left.height,
-                                          node.right.height) + 1;
-        
-        return node.height == expectedNodeHeight;
-    }
-         
-    
-    
     private static <E> boolean containsImpl(TreeListNode<E> node, E element) {
         if (node == null) {
             return false;
@@ -719,5 +668,243 @@ public class TreeList<E> implements List<E> {
     private static final record Split<E>(TreeListNode<E> left, 
                                          TreeListNode<E> right) {
         
+    }
+
+    private class SubList extends AbstractList<E> {
+
+        private final int fromIndex;
+        private final int toIndex;
+        
+        public SubList(int fromIndex, int toIndex) {
+            Objects.checkFromToIndex(fromIndex, toIndex, size());
+            
+            this.fromIndex = fromIndex;
+            this.toIndex   = toIndex;
+        }
+
+        @Override
+        public void clear() {
+            TreeList.this.removeRange(fromIndex, toIndex);
+        }
+
+        @Override
+        public E get(int index) {
+            return TreeList.this.get(fromIndex + index);
+        }
+
+        @Override
+        public int size() {
+            return toIndex - fromIndex;
+        }
+    }
+    
+    private final class TreeIterator implements ListIterator<E> {
+
+        private int cursor;
+        private int lastIndex        = -1;
+        private int expectedModCount = modCount;
+        
+        private final List<TreeListNode<E>> path = new ArrayList<>();
+        private TreeListNode<E> last;
+        
+        TreeIterator(int index) {
+            cursor = index;
+            rebuildPath();
+        }
+        
+        private void checkModification() {
+            if (expectedModCount != modCount) {
+                throw new ConcurrentModificationException();
+            }
+        }    
+        
+        private void rebuildPath() {
+            path.clear();
+            
+            if (cursor == size()) {
+                return;
+            }
+            
+            int index = cursor;
+            TreeListNode<E> node = root;
+            
+            while (node != null) {
+                path.add(node);
+                
+                int leftSize = treeSize(node.left);
+                
+                if (index == leftSize) {
+                    return;
+                }
+                
+                if (index < leftSize) {
+                    node = node.left;
+                } else {
+                    index -= leftSize + 1;
+                    node = node.right;
+                }
+            }
+        }
+        
+        private void advancePath() {
+            TreeListNode<E> node = path.getLast();
+            
+            if (node.right != null) {
+                node = node.right;
+                
+                while (node != null) {
+                    path.add(node);
+                    node = node.left;
+                }
+            } else {
+                path.removeLast();
+                
+                while (!path.isEmpty()) {
+                    TreeListNode<E> ancestor = path.getLast();
+                    
+                    if (ancestor.left == node) {
+                        return;
+                    }
+                    
+                    node = ancestor;
+                    path.removeLast();
+                }
+            }
+        }
+        
+        private void retreatPath() {
+            if (path.isEmpty()) {
+                TreeListNode<E> node = root;
+                
+                while (node != null) {
+                    path.add(node);
+                    node = node.right;
+                }
+                
+                return;
+            }
+            
+            TreeListNode<E> node = path.getLast();
+            
+            if (node.left != null) {
+                node = node.left;
+                
+                while (node != null) {
+                    path.add(node);
+                    node = node.right;
+                }
+            } else {
+                path.removeLast();
+                
+                while (!path.isEmpty()) {
+                    TreeListNode<E> ancestor = path.getLast();
+                    
+                    if (ancestor.right == node) {
+                        return;
+                    }
+                    
+                    node = ancestor;
+                    path.removeLast();
+                }
+            }
+        }
+        
+        @Override
+        public boolean hasNext() {
+            return cursor < size();
+        }
+
+        @Override
+        public boolean hasPrevious() {
+            return cursor > 0;
+        }
+
+        @Override
+        public int nextIndex() {
+            return cursor;
+        }
+
+        @Override
+        public int previousIndex() {
+            return cursor - 1;
+        }
+
+        @Override
+        public E next() {
+            checkModification();
+            
+            if (!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            
+            last = path.getLast();
+            lastIndex = cursor++;
+            advancePath();
+            return last.element;
+        }
+
+        @Override
+        public E previous() {
+            checkModification();
+            
+            if (!hasPrevious()) {
+                throw new NoSuchElementException();
+            }
+            
+            retreatPath();
+            last = path.getLast();
+            lastIndex = --cursor;
+            return last.element;
+        }
+
+        @Override
+        public void remove() {
+            checkModification();
+            
+            if (lastIndex < 0) {
+                throw new IllegalStateException();
+            }
+            
+            TreeList.this.remove(lastIndex);
+            
+            if (lastIndex < cursor) {
+                --cursor;
+            }
+            
+            rebuildPath();
+            last = null;
+            lastIndex = -1;
+            expectedModCount = modCount;
+        }
+
+        @Override
+        public void set(E e) {
+            checkModification();
+            
+            if (lastIndex < 0) {
+                throw new IllegalStateException();
+            }
+            
+            last.element = e;
+        }
+
+        @Override
+        public void add(E e) {
+            checkModification();
+            
+            TreeList.this.add(cursor, e);
+            ++cursor;
+            rebuildPath();
+            last = null;
+            lastIndex = -1;
+            expectedModCount = modCount;
+        }
+    }
+    
+    private void checkPosition(int index) {
+        if (index < 0 || index > size()) {
+            throw new IndexOutOfBoundsException(
+                    "Index: " + index + ", size: " + size());
+        }
     }
 }
