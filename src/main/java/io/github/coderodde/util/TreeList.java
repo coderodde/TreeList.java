@@ -26,8 +26,6 @@ import java.util.stream.Stream;
  */
 public class TreeList<E> implements List<E> {
     
-    private static final int INCORRECT_HEIGHT_SENTINEL = 1_000_000;
-
     private static final class TreeListNode<E> {
         E element;
         TreeListNode<E> left;
@@ -74,14 +72,13 @@ public class TreeList<E> implements List<E> {
     private TreeListNode<E> root;
     
     /**
-     * The number of elements in this list.
-     */
-    private int size;
-    
-    /**
      * The number of modifications made into this list.
      */
     private int modCount;
+    
+    public TreeList() {
+        
+    }
     
     public TreeList(Collection<? extends E> elements) {
         Object[] array = Objects.requireNonNull(elements).toArray();
@@ -95,12 +92,12 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public boolean isEmpty() {
-        return size == 0;
+        return size() == 0;
     }
 
     @Override
     public boolean contains(Object o) {
-        return containsImpl(root, (E) o);
+        return containsImpl(root, o);
     }
 
     @Override
@@ -110,7 +107,14 @@ public class TreeList<E> implements List<E> {
     
     @Override
     public Object[] toArray() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        Object[] array = new Object[size()];
+        int index = 0;
+        
+        for (E e : this) {
+            array[index++] = e;
+        }
+        
+        return array;
     }
 
     @Override
@@ -120,26 +124,8 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public boolean add(E e) {
-        ++modCount;
-        
-        if (root == null) {
-            root = new TreeListNode<>(e);
-            root.treeSize = 1;
-            size = 1;
-            return true;
-        }
-        
-        TreeListNode<E> node = root;
-        
-        while (node.right != null) {
-            node = node.right;
-        }
-        
-        TreeListNode<E> newNode = new TreeListNode<>(e);
-        node.right              = newNode;
-        newNode.treeSize        = 1;
-        
-        return true;
+        add(size(), e);
+        return true;    
     }
 
     @Override
@@ -155,16 +141,6 @@ public class TreeList<E> implements List<E> {
     @Override
     public boolean addAll(Collection<? extends E> elements) {
         return addAll(size(), elements);
-    }
-    
-    private void appendSubTree(TreeListNode<E> subTreeRoot) {
-        TreeListNode<E> node = root;
-        
-        while (node.right != null) {
-            node = node.right;
-        }
-        
-        node.right = subTreeRoot;
     }
     
     @Override
@@ -230,8 +206,10 @@ public class TreeList<E> implements List<E> {
     @Override
     public E set(int index, E element) {
         TreeListNode<E> node = nodeAt(Objects.checkIndex(index, size()));
+        
         E old        = node.element;
         node.element = element;
+        
         return old;
     }
 
@@ -240,7 +218,7 @@ public class TreeList<E> implements List<E> {
         checkPosition(index);
         
         if (size() == Integer.MAX_VALUE) {
-            throw new IllegalStateException("List is to large.");
+            throw new IllegalStateException("List is too large.");
         }
         
         root = insert(root, index, element);
@@ -298,21 +276,37 @@ public class TreeList<E> implements List<E> {
 
     @Override
     public E getFirst() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        
         return nodeAt(0).element;
     }
 
     @Override
     public E getLast() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        
         return nodeAt(size() - 1).element;
     }
 
     @Override
     public E removeFirst() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        
         return remove(0);
     }
 
     @Override
     public E removeLast() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+        
         return remove(size() - 1);
     }
 
@@ -361,6 +355,7 @@ public class TreeList<E> implements List<E> {
         Split<E> prefix = split(root, fromIndex);
         Split<E> suffix = split(prefix.right(), toIndex - fromIndex);
         root            = join(prefix.left(), suffix.right());
+        
         ++modCount;
     }
     
@@ -640,6 +635,10 @@ public class TreeList<E> implements List<E> {
             return true;
         }
         
+        if (visited.contains(node)) {
+            return false;
+        }
+        
         visited.add(node);
         
         if (!treeHasNoCycles(visited, node.left) ||
@@ -661,7 +660,7 @@ public class TreeList<E> implements List<E> {
             return true;
         }
         
-        return containsImpl(node.left, element) && 
+        return containsImpl(node.left, element) ||
                containsImpl(node.right, element);
     }
     
@@ -676,7 +675,7 @@ public class TreeList<E> implements List<E> {
         private final int toIndex;
         
         public SubList(int fromIndex, int toIndex) {
-            Objects.checkFromToIndex(fromIndex, toIndex, size());
+            Objects.checkFromToIndex(fromIndex, toIndex, size);
             
             this.fromIndex = fromIndex;
             this.toIndex   = toIndex;
