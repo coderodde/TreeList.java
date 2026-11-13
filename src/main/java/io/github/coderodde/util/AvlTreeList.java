@@ -2,6 +2,7 @@ package io.github.coderodde.util;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.ConcurrentModificationException;
@@ -99,7 +100,19 @@ public class AvlTreeList<E> implements List<E> {
 
     @Override
     public <T> T[] toArray(T[] a) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Object[] thisArray = toArray();
+        
+        if (a.length < size()) {
+            return (T[]) Arrays.copyOf(thisArray, size());
+        }
+        
+        System.arraycopy(thisArray, 0, a, 0, size());
+        
+        if (a.length > size()) {
+            a[size()] = null;
+        }
+        
+        return a;
     }
 
     @Override
@@ -110,7 +123,16 @@ public class AvlTreeList<E> implements List<E> {
 
     @Override
     public boolean remove(Object o) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        Iterator<E> iter = iterator();
+        
+        while (iter.hasNext()) {
+            if (Objects.equals(iter.next(), o)) {
+                iter.remove();
+                return true;
+            }
+        }
+    
+        return false;
     }
 
     @Override
@@ -173,9 +195,23 @@ public class AvlTreeList<E> implements List<E> {
     @Override
     public void clear() {
         if (root != null) {
+            nullify(root);
             root = null;
             ++modCount;
         }
+    }
+    
+    private static <E> void nullify(TreeListNode<E> node) {
+        if (node == null) {
+            return;
+        }
+        
+        nullify(node.left);
+        nullify(node.right);
+        
+        node.left    = null;
+        node.right   = null;
+        node.element = null;
     }
 
     @Override
@@ -623,16 +659,16 @@ public class AvlTreeList<E> implements List<E> {
         public SubList(int fromIndex, int toIndex) {
             int parentSize = AvlTreeList.this.size();
             
-            if (fromIndex < 0 || toIndex > parentSize) {
-                throw new IndexOutOfBoundsException();
-            }
-            
             if (fromIndex > toIndex) {
-                throw new IllegalArgumentException("fromIndex > toIndex");
+                throw new IllegalArgumentException(
+                    "fromIndex(%d) > toIndex(%d)".formatted(fromIndex, toIndex)
+                );
             }
             
-            this.fromIndex = fromIndex;
-            this.viewSize = toIndex - fromIndex;
+            Objects.checkFromToIndex(fromIndex, toIndex, parentSize);
+            
+            this.fromIndex        = fromIndex;
+            this.viewSize         = toIndex - fromIndex;
             this.expectedModCount = AvlTreeList.this.modCount;
         }
 
@@ -644,21 +680,15 @@ public class AvlTreeList<E> implements List<E> {
 
         @Override
         public void clear() {
-            removeRange(0, size());
-        }
-
-        @Override
-        protected void removeRange(int from, int to) {
             checkModification();
-            Objects.checkFromToIndex(from, to, viewSize);
             
-            if (from == to) {
+            if (viewSize == 0) {
                 return;
             }
             
-            AvlTreeList.this.removeRange(fromIndex + from, fromIndex + to);
+            AvlTreeList.this.removeRange(fromIndex, fromIndex + viewSize);
             
-            viewSize -= to - from;
+            viewSize = 0;
             expectedModCount = AvlTreeList.this.modCount;
             ++modCount;
         }
